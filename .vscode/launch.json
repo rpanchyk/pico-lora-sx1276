@@ -1,0 +1,52 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Pico Debug",
+            "type": "cortex-debug",
+            "cwd": "${workspaceRoot}",
+            "executable": "${command:cmake.launchTargetPath}",
+            "request": "launch",
+            "servertype": "openocd",
+            "gdbPath": "gdb-multiarch",
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "target/rp2040.cfg"
+            ],
+            "searchDir": [
+                "${env:PICO_SDK_PATH}/../openocd/tcl"
+            ],
+            "svdFile": "${env:PICO_SDK_PATH}/src/rp2040/hardware_regs/rp2040.svd",
+            "runToEntryPoint": "main",
+            "postRestartCommands": [
+                "break main",
+                "continue"
+            ]
+        },
+        {
+            // sudo openocd -c "adapter speed 5000" -c "transport select swd" -f interface/cmsis-dap.cfg -f target/rp2040.cfg -s tcl
+            "name": "External Debug",
+            "type": "cortex-debug",
+            "cwd": "${workspaceRoot}",
+            "executable": "${command:cmake.launchTargetPath}",
+            "request": "launch",
+            "servertype": "external",
+            "gdbPath": "gdb-multiarch",
+            "gdbTarget": "localhost:3333",
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "target/rp2040.cfg"
+            ],
+            "searchDir": [
+                "${env:PICO_SDK_PATH}/../openocd/tcl"
+            ],
+            "svdFile": "${env:PICO_SDK_PATH}/src/rp2040/hardware_regs/rp2040.svd",
+            "runToEntryPoint": "main",
+            "postRestartCommands": [
+                "break main",
+                "continue"
+            ],
+            "showDevDebugOutput": "raw"
+        }
+    ]
+}
