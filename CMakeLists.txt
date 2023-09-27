@@ -9,25 +9,32 @@ project(pico_lora_sx1276 C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-# Creates a pico-sdk subdirectory in our project for the libraries
+# Create a pico-sdk subdirectory in project for the libraries
 pico_sdk_init()
 
-# Tell CMake where to find the executable source file
-add_executable(${PROJECT_NAME}
-    radio_sx1276.c
-    driver/radio.c
+# Create an INTERFACE library aggregating all the common parts
+add_library(commons INTERFACE)
+
+# Note: CMake policy is to use absolute paths for interface libraries
+target_sources(commons INTERFACE
+    ${CMAKE_CURRENT_LIST_DIR}/driver/radio.c
 )
 
-# Link to pico_stdlib (gpio, time, etc. functions)
-target_link_libraries(${PROJECT_NAME}
+target_compile_definitions(commons INTERFACE)
+
+# Include library dependencies
+target_link_libraries(commons INTERFACE
     pico_stdlib
     hardware_uart
     hardware_spi
 )
 
-# Create map/bin/hex/uf2 files
-pico_add_extra_outputs(${PROJECT_NAME})
+add_executable(receiver ${CMAKE_CURRENT_LIST_DIR}/receiver.c)
+target_link_libraries(receiver commons)
+target_compile_definitions(receiver PRIVATE)
+pico_add_extra_outputs(receiver)
 
-# Enable usb output, disable uart output
-# pico_enable_stdio_usb(${PROJECT_NAME} 1)
-# pico_enable_stdio_uart(${PROJECT_NAME} 0)
+add_executable(transmitter ${CMAKE_CURRENT_LIST_DIR}/transmitter.c)
+target_link_libraries(transmitter commons)
+target_compile_definitions(transmitter PRIVATE)
+pico_add_extra_outputs(transmitter)

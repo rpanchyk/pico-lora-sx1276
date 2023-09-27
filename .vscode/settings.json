@@ -5,17 +5,17 @@
     "cmake.configureOnOpen": true,
     "cmake.buildBeforeRun": true,
     "cmake.statusbar.advanced": {
-        "buildTarget": {
-            "visibility": "default"
-        },
         "build": {
             "visibility": "default"
         },
-        "launchTarget": {
-            "visibility": "hidden"
+        "buildTarget": {
+            "visibility": "default"
         },
         "launch": {
             "visibility": "hidden"
+        },
+        "launchTarget": {
+            "visibility": "default"
         },
         "debug": {
             "visibility": "hidden"

@@ -23,27 +23,17 @@
 int main()
 {
     // stdio_init_all();
+    sleep_ms(2000); // debug only to wait for serial (UART) initialized
 
     uart_t uart = {UART0_ID, UART0_BAUD_RATE, UART0_TX_PIN, UART0_RX_PIN};
     spi_t spi = {SPI0_ID, SPI0_CS_PIN, SPI0_SCK_PIN, SPI0_MOSI_PIN, SPI0_MISO_PIN};
     radio_t radio = sx1276_createRadio(&uart, &spi, true);
 
-    // uint8_t version = sx1276_getVersion(&radio);
-    // sprintf(message, "Version: %d\r\n", version);
-    // uart_puts(UART0_ID, message);
-
-    // uint8_t opMode = sx1276_getOperatingMode(&radio);
-    // sprintf(message, "OperatingMode: %d\r\n", opMode);
-    // uart_puts(UART0_ID, message);
-
-    // char message[512];
     sx1276_logInfo(&radio);
-    // uart_puts(UART0_ID, message);
 
     uint8_t data[] = {'P', 'I', 'N', 'G'};
     while (true)
     {
-        // tight_loop_contents();
         sx1276_send(&radio, data, sizeof(data));
         sleep_ms(1000);
     }
