@@ -3,7 +3,7 @@
 #include "pico/stdlib.h"
 #include "hardware/uart.h"
 #include "hardware/irq.h"
-#include "driver/radio.h"
+#include "sx1276.h"
 
 #define UART0_ID uart0
 #define UART0_BAUD_RATE 115200
@@ -31,9 +31,10 @@ int main()
 
     sx1276_logInfo(&radio);
 
+    uint8_t data[] = {'P', 'I', 'N', 'G'};
     while (true)
     {
-        uart_puts(UART0_ID, "Listen...\r\n");
+        sx1276_send(&radio, data, sizeof(data));
         sleep_ms(1000);
     }
 }

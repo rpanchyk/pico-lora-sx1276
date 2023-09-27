@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
-#include "radio.h"
+#include "sx1276.h"
 #include "regs.h"
 
 radio_t sx1276_createRadio(uart_t *uart, spi_t *spi, bool isLowRange)

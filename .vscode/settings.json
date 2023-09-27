@@ -20,5 +20,16 @@
         "debug": {
             "visibility": "hidden"
         }
+    },
+    "files.associations": {
+        "_default_types.h": "c",
+        "atomic": "c",
+        "cstdint": "c",
+        "uart.h": "c",
+        "functional": "c",
+        "irq.h": "c",
+        "radio.h": "c",
+        "stdlib.h": "c",
+        "sx1276.h": "c"
     }
 }
