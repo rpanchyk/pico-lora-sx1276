@@ -44,3 +44,4 @@ void sx1276_setTxMode(radio_t *radio);
 void sx1276_setRxMode(radio_t *radio);
 
 void sx1276_send(radio_t *radio, uint8_t *data, size_t size);
+void sx1276_receive(radio_t *radio, uint16_t timeout);

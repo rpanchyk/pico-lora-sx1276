@@ -33,7 +33,7 @@ int main()
 
     while (true)
     {
-        uart_puts(UART0_ID, "Listen...\r\n");
+        sx1276_receive(&radio, 0);
         sleep_ms(1000);
     }
 }

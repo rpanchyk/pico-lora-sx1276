@@ -232,7 +232,6 @@ void sx1276_logInfo(radio_t *radio)
             txContinuousMode,
             rxPayloadCrcOn,
             symbTimeout);
-
     uart_puts(radio->uart->inst, buffer);
 }
 
@@ -336,7 +335,7 @@ void sx1276_send(radio_t *radio, uint8_t *data, size_t size)
 {
     while (sx1276_isTxMode(radio))
     {
-        uart_puts(radio->uart->inst, "Wait TX is finished...\r\n");
+        uart_puts(radio->uart->inst, "Wait for ongoing TX is finished...\r\n");
         sleep_ms(1);
     }
     sx1276_setStandByMode(radio);
@@ -354,6 +353,7 @@ void sx1276_send(radio_t *radio, uint8_t *data, size_t size)
     sx1276_writeRegister(radio, REG_PAYLOADLENGTH, size);
 
     sx1276_setTxMode(radio);
+
     // TX mode switched to STANDBY mode automatically after data is sent
     uart_puts(radio->uart->inst, "Sending ");
     while (!sx1276_isStandByMode(radio))
@@ -362,4 +362,55 @@ void sx1276_send(radio_t *radio, uint8_t *data, size_t size)
         sleep_ms(1);
     }
     uart_puts(radio->uart->inst, " Done\r\n");
+}
+
+void sx1276_receive(radio_t *radio, uint16_t timeout)
+{
+    while (sx1276_isRxMode(radio))
+    {
+        uart_puts(radio->uart->inst, "Wait for ongoing RX is finished...\r\n");
+        sleep_ms(1);
+    }
+    sx1276_setStandByMode(radio);
+
+    uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFORXBASEADDR);
+    sx1276_writeRegister(radio, REG_FIFOADDRPTR, addrPtr);
+
+    sx1276_setRxMode(radio);
+
+    // RX mode switched to STANDBY mode automatically after data is received or timed out
+    uart_puts(radio->uart->inst, "Receiving ");
+    while (!sx1276_isStandByMode(radio))
+    {
+        uart_puts(radio->uart->inst, ".");
+        sleep_ms(1);
+    }
+    uart_puts(radio->uart->inst, " Done\r\n");
+
+    // Ensure that ValidHeader, PayloadCrcError, RxDone and RxTimeout interrupts
+    // are not asserted to ensure that packet reception has terminated successfully
+    uint8_t irqFlagsMask = sx1276_readRegister(radio, REG_IRQFLAGSMASK);
+    uint8_t irqFlags = sx1276_readRegister(radio, REG_IRQFLAGS);
+
+    uint8_t rxTimeout = (irqFlags & ~IRQFLAGS_RXTIMEOUT_MASK) >> 7;
+    uint8_t rxDone = (irqFlags & ~IRQFLAGS_RXDONE_MASK) >> 6;
+    uint8_t payloadCrcError = (irqFlags & ~IRQFLAGS_PAYLOADCRCERROR_MASK) >> 5;
+    uint8_t validHeader = (irqFlags & ~IRQFLAGS_VALIDHEADER_MASK) >> 4;
+
+    char buffer[512];
+    sprintf(buffer,
+            "IrqFlagsMask: %u \
+            \r\nIrqFlags: %u \
+            \r\nRxTimeout: %u \
+            \r\nRxDone: %u \
+            \r\nPayloadCrcError: %u \
+            \r\nValidHeader: %u \
+            \r\n\r\n",
+            irqFlagsMask,
+            irqFlags,
+            rxTimeout,
+            rxDone,
+            payloadCrcError,
+            validHeader);
+    uart_puts(radio->uart->inst, buffer);
 }
