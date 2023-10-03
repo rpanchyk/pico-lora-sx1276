@@ -2,6 +2,7 @@
     "files.autoSave": "afterDelay",
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
     "cortex-debug.openocdPath": "${env:PICO_SDK_PATH}/../openocd/src/openocd",
+    "cmake.generator": "Unix Makefiles",
     "cmake.configureOnOpen": true,
     "cmake.buildBeforeRun": true,
     "cmake.statusbar.advanced": {

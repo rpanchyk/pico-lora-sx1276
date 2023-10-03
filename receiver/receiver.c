@@ -34,6 +34,5 @@ int main()
     while (true)
     {
         sx1276_receive(&radio, 0);
-        sleep_ms(1000);
     }
 }

@@ -25,6 +25,11 @@ radio_t sx1276_createRadio(uart_t *uart, spi_t *spi, bool isLowRange)
     uint8_t opModeDefaults = OPMODE_LONGRANGEMODE | (isLowRange ? OPMODE_LOWFREQUENCYMODEON : 0x00);
     radio_t radio = {uart, spi, opModeDefaults};
     sx1276_setSleepMode(&radio); // to enable Lora when change mode next time
+
+    // TODO
+    sx1276_writeRegister(&radio, REG_MODEMCONFIG2, 0b01110000);
+    sx1276_writeRegister(&radio, REG_SYMBTIMEOUTLSB, 0b11111111);
+
     return radio;
 }
 
@@ -157,43 +162,6 @@ static uint16_t getSymbTimeout(radio_t *radio)
     uint8_t symbTimeoutMsb = sx1276_readRegister(radio, REG_MODEMCONFIG2) & ~MCFG2_SYMBTIMEOUT_MASK;
     uint8_t symbTimeoutLsb = sx1276_readRegister(radio, REG_SYMBTIMEOUTLSB);
     return (symbTimeoutMsb << 8) + symbTimeoutLsb;
-}
-
-void sx1276_getInfo(radio_t *radio, char *buffer)
-{
-    uint8_t version = getVersion(radio);
-    uint8_t opMode = getOperatingMode(radio);
-    uint64_t frequency = getFrequency(radio);
-    uint64_t bandwidth = getBandwidth(radio);
-    uint8_t codingRate = getCodingRate(radio);
-    uint8_t implicitHeaderModeOn = getImplicitHeaderModeOn(radio);
-    uint8_t spreadingFactor = getSpreadingFactor(radio);
-    uint8_t txContinuousMode = getTxContinuousMode(radio);
-    uint8_t rxPayloadCrcOn = getRxPayloadCrcOn(radio);
-    uint16_t symbTimeout = getSymbTimeout(radio);
-
-    sprintf(buffer,
-            "\r\nVersion: %u \
-            \r\nOperatingMode: %u \
-            \r\nFrequency: %llu \
-            \r\nBandwidth: %llu \
-            \r\nCodingRate: 4/%u \
-            \r\nImplicitHeaderModeOn: %u \
-            \r\nSpreadingFactor: %u \
-            \r\nTxContinuousMode: %u \
-            \r\nRxPayloadCrcOn: %u \
-            \r\nSymbTimeout: %lu \
-            \r\n\r\n",
-            version,
-            opMode,
-            frequency,
-            bandwidth,
-            codingRate,
-            implicitHeaderModeOn,
-            spreadingFactor,
-            txContinuousMode,
-            rxPayloadCrcOn,
-            symbTimeout);
 }
 
 void sx1276_logInfo(radio_t *radio)
@@ -373,6 +341,8 @@ void sx1276_receive(radio_t *radio, uint16_t timeout)
     }
     sx1276_setStandByMode(radio);
 
+    // uart_puts(radio->uart->inst, "Configuring");
+
     uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFORXBASEADDR);
     sx1276_writeRegister(radio, REG_FIFOADDRPTR, addrPtr);
 
@@ -397,20 +367,74 @@ void sx1276_receive(radio_t *radio, uint16_t timeout)
     uint8_t payloadCrcError = (irqFlags & ~IRQFLAGS_PAYLOADCRCERROR_MASK) >> 5;
     uint8_t validHeader = (irqFlags & ~IRQFLAGS_VALIDHEADER_MASK) >> 4;
 
-    char buffer[512];
-    sprintf(buffer,
-            "IrqFlagsMask: %u \
-            \r\nIrqFlags: %u \
-            \r\nRxTimeout: %u \
-            \r\nRxDone: %u \
-            \r\nPayloadCrcError: %u \
-            \r\nValidHeader: %u \
-            \r\n\r\n",
-            irqFlagsMask,
-            irqFlags,
-            rxTimeout,
-            rxDone,
-            payloadCrcError,
-            validHeader);
-    uart_puts(radio->uart->inst, buffer);
+    uint8_t rxHeaderCntValueMsb = sx1276_readRegister(radio, REG_RXHEADERCNTVALUEMSB);
+    uint8_t rxHeaderCntValueLsb = sx1276_readRegister(radio, REG_RXHEADERCNTVALUELSB);
+    uint16_t rxHeaderCntValue = (rxHeaderCntValueMsb << 8) + rxHeaderCntValueLsb;
+
+    uint8_t rxPacketCntValueMsb = sx1276_readRegister(radio, REG_RXPACKETCNTVALUEMSB);
+    uint8_t rxPacketCntValueLsb = sx1276_readRegister(radio, REG_RXPACKETCNTVALUELSB);
+    uint16_t rxPacketCntValue = (rxPacketCntValueMsb << 8) + rxPacketCntValueLsb;
+
+    uint8_t rxNbBytes = sx1276_readRegister(radio, REG_RXNBBYTES);
+
+    if (rxDone)
+    {
+        if (rxTimeout)
+        {
+            uart_puts(radio->uart->inst, "Timeout error\r\n");
+        }
+        else if (!validHeader)
+        {
+            uart_puts(radio->uart->inst, "Header error\r\n");
+        }
+        else if (payloadCrcError)
+        {
+            uart_puts(radio->uart->inst, "Payload error\r\n");
+        }
+        else
+        {
+            uart_puts(radio->uart->inst, "Reception successful\r\n");
+
+            char buffer[512];
+            sprintf(buffer,
+                    "IrqFlagsMask: %u \
+                    \r\nIrqFlags: %u \
+                    \r\nRxTimeout: %u \
+                    \r\nRxDone: %u \
+                    \r\nPayloadCrcError: %u \
+                    \r\nValidHeader: %u \
+                    \r\nRxHeaderCntValue: %u \
+                    \r\nRxPacketCntValue: %u \
+                    \r\nRxNbBytes: %u \
+                    \r\n",
+                    irqFlagsMask,
+                    irqFlags,
+                    rxTimeout,
+                    rxDone,
+                    payloadCrcError,
+                    validHeader,
+                    rxHeaderCntValue,
+                    rxPacketCntValue,
+                    rxNbBytes);
+            uart_puts(radio->uart->inst, buffer);
+
+            uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFORXCURRENTADDR);
+            sx1276_writeRegister(radio, REG_FIFOADDRPTR, addrPtr);
+
+            uart_puts(radio->uart->inst, "Reading data ...");
+            uint8_t data[rxNbBytes];
+            for (uint8_t i = 0; i < rxNbBytes; i++)
+            {
+                data[i] = sx1276_readRegister(radio, REG_FIFO);
+            }
+            uart_puts(radio->uart->inst, " Done\r\n");
+
+            uart_puts(radio->uart->inst, "Received: ");
+            uart_puts(radio->uart->inst, data);
+            uart_puts(radio->uart->inst, "\r\n\r\n");
+        }
+    }
+
+    // clear IRQs
+    sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
 }

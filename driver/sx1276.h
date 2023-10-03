@@ -31,7 +31,6 @@ radio_t sx1276_createRadio(uart_t *uart, spi_t *spi, bool isLowRange);
 uint8_t sx1276_readRegister(radio_t *radio, uint8_t addr);
 void sx1276_writeRegister(radio_t *radio, uint8_t addr, uint8_t data);
 
-void sx1276_getInfo(radio_t *radio, char *buffer);
 void sx1276_logInfo(radio_t *radio);
 
 bool sx1276_isSleepMode(radio_t *radio);
