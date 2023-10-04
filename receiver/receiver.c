@@ -29,10 +29,11 @@ int main()
     spi_t spi = {SPI0_ID, SPI0_CS_PIN, SPI0_SCK_PIN, SPI0_MOSI_PIN, SPI0_MISO_PIN};
     radio_t radio = sx1276_createRadio(&uart, &spi, true);
 
+    sx1276_configureReceiverWithDefaults(&radio);
     sx1276_logInfo(&radio);
 
     while (true)
     {
-        sx1276_receive(&radio, 0);
+        sx1276_receive(&radio);
     }
 }

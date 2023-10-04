@@ -4,36 +4,7 @@
 #include "sx1276.h"
 #include "regs.h"
 
-radio_t sx1276_createRadio(uart_t *uart, spi_t *spi, bool isLowRange)
-{
-    // UART
-    uart_init(uart->inst, uart->baud_rate);
-    gpio_set_function(uart->tx_pin, GPIO_FUNC_UART);
-    gpio_set_function(uart->rx_pin, GPIO_FUNC_UART);
-
-    // SPI
-    spi_init(spi->inst, 1000 * 1000);
-    spi_set_format(spi->inst, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
-    gpio_set_function(spi->sck_pin, GPIO_FUNC_SPI);
-    gpio_set_function(spi->mosi_pin, GPIO_FUNC_SPI);
-    gpio_set_function(spi->miso_pin, GPIO_FUNC_SPI);
-    gpio_init(spi->cs_pin);
-    gpio_set_dir(spi->cs_pin, GPIO_OUT);
-    gpio_put(spi->cs_pin, 1);
-
-    // RADIO
-    uint8_t opModeDefaults = OPMODE_LONGRANGEMODE | (isLowRange ? OPMODE_LOWFREQUENCYMODEON : 0x00);
-    radio_t radio = {uart, spi, opModeDefaults};
-    sx1276_setSleepMode(&radio); // to enable Lora when change mode next time
-
-    // TODO
-    sx1276_writeRegister(&radio, REG_MODEMCONFIG2, 0b01110000);
-    sx1276_writeRegister(&radio, REG_SYMBTIMEOUTLSB, 0b11111111);
-
-    return radio;
-}
-
-uint8_t sx1276_readRegister(radio_t *radio, uint8_t addr)
+static uint8_t sx1276_readRegister(radio_t *radio, uint8_t addr)
 {
     uint8_t src = addr & 0x7F; // set wnr bit to 0 for read access
     uint8_t buffer;
@@ -46,7 +17,7 @@ uint8_t sx1276_readRegister(radio_t *radio, uint8_t addr)
     return buffer;
 }
 
-void sx1276_writeRegister(radio_t *radio, uint8_t addr, uint8_t data)
+static void sx1276_writeRegister(radio_t *radio, uint8_t addr, uint8_t data)
 {
     uint8_t src[2];
     src[0] = addr | 0x80; // set wnr bit to 1 for write access
@@ -164,6 +135,131 @@ static uint16_t getSymbTimeout(radio_t *radio)
     return (symbTimeoutMsb << 8) + symbTimeoutLsb;
 }
 
+static bool sx1276_isSleepMode(radio_t *radio)
+{
+    uint8_t opMode = getOperatingMode(radio);
+    return (opMode & ~OPMODE_MASK) == OPMODE_SLEEP_MODE;
+}
+
+static void sx1276_setSleepMode(radio_t *radio)
+{
+    uart_puts(radio->uart->inst, "Going to SLEEP mode ");
+    if (!sx1276_isSleepMode(radio))
+    {
+        sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_SLEEP_MODE);
+        while (!sx1276_isSleepMode(radio))
+        {
+            uart_puts(radio->uart->inst, ".");
+        }
+        uart_puts(radio->uart->inst, " Done\r\n");
+    }
+    else
+    {
+        uart_puts(radio->uart->inst, "... Already\r\n");
+    }
+}
+
+static bool sx1276_isStandByMode(radio_t *radio)
+{
+    uint8_t opMode = getOperatingMode(radio);
+    return (opMode & ~OPMODE_MASK) == OPMODE_STDBY_MODE;
+}
+
+static void sx1276_setStandByMode(radio_t *radio)
+{
+    uart_puts(radio->uart->inst, "Going to STANDBY mode ");
+    if (!sx1276_isStandByMode(radio))
+    {
+        sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_STDBY_MODE);
+        while (!sx1276_isStandByMode(radio))
+        {
+            uart_puts(radio->uart->inst, ".");
+        }
+        uart_puts(radio->uart->inst, " Done\r\n");
+    }
+    else
+    {
+        uart_puts(radio->uart->inst, "... Already\r\n");
+    }
+}
+
+static bool sx1276_isTxMode(radio_t *radio)
+{
+    uint8_t opMode = getOperatingMode(radio);
+    return (opMode & ~OPMODE_MASK) == OPMODE_TX_MODE;
+}
+
+static void sx1276_setTxMode(radio_t *radio)
+{
+    uart_puts(radio->uart->inst, "Going to TX mode ");
+    if (!sx1276_isTxMode(radio))
+    {
+        sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_TX_MODE);
+        while (!sx1276_isTxMode(radio))
+        {
+            uart_puts(radio->uart->inst, ".");
+        }
+        uart_puts(radio->uart->inst, " Done\r\n");
+    }
+    else
+    {
+        uart_puts(radio->uart->inst, "... Already\r\n");
+    }
+}
+
+static bool sx1276_isRxMode(radio_t *radio)
+{
+    uint8_t opMode = getOperatingMode(radio);
+    return (opMode & ~OPMODE_MASK) == OPMODE_RXSINGLE_MODE;
+}
+
+static void sx1276_setRxMode(radio_t *radio)
+{
+    uart_puts(radio->uart->inst, "Going to RX mode ");
+    if (!sx1276_isRxMode(radio))
+    {
+        sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_RXSINGLE_MODE);
+        while (!sx1276_isRxMode(radio))
+        {
+            uart_puts(radio->uart->inst, ".");
+        }
+        uart_puts(radio->uart->inst, " Done\r\n");
+    }
+    else
+    {
+        uart_puts(radio->uart->inst, "... Already\r\n");
+    }
+}
+
+radio_t sx1276_createRadio(uart_t *uart, spi_t *spi, bool isLowRange)
+{
+    // UART
+    uart_init(uart->inst, uart->baud_rate);
+    gpio_set_function(uart->tx_pin, GPIO_FUNC_UART);
+    gpio_set_function(uart->rx_pin, GPIO_FUNC_UART);
+
+    // SPI
+    spi_init(spi->inst, 1000 * 1000);
+    spi_set_format(spi->inst, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    gpio_set_function(spi->sck_pin, GPIO_FUNC_SPI);
+    gpio_set_function(spi->mosi_pin, GPIO_FUNC_SPI);
+    gpio_set_function(spi->miso_pin, GPIO_FUNC_SPI);
+    gpio_init(spi->cs_pin);
+    gpio_set_dir(spi->cs_pin, GPIO_OUT);
+    gpio_put(spi->cs_pin, 1);
+
+    // RADIO
+    uint8_t opModeDefaults = OPMODE_LONGRANGEMODE | (isLowRange ? OPMODE_LOWFREQUENCYMODEON : 0x00);
+    radio_t radio = {uart, spi, opModeDefaults};
+    sx1276_setSleepMode(&radio); // to enable Lora when change mode next time
+
+    // TODO
+    sx1276_writeRegister(&radio, REG_MODEMCONFIG2, 0b01110000);
+    sx1276_writeRegister(&radio, REG_SYMBTIMEOUTLSB, 0b11111111);
+
+    return radio;
+}
+
 void sx1276_logInfo(radio_t *radio)
 {
     uint8_t version = getVersion(radio);
@@ -203,100 +299,12 @@ void sx1276_logInfo(radio_t *radio)
     uart_puts(radio->uart->inst, buffer);
 }
 
-bool sx1276_isSleepMode(radio_t *radio)
+void sx1276_configureSender(radio_t *radio, tx_cfg_t *config)
 {
-    uint8_t opMode = getOperatingMode(radio);
-    return (opMode & ~OPMODE_MASK) == OPMODE_SLEEP_MODE;
 }
 
-void sx1276_setSleepMode(radio_t *radio)
+void sx1276_configureSenderWithDefaults(radio_t *radio)
 {
-    uart_puts(radio->uart->inst, "Going to SLEEP mode ");
-    if (!sx1276_isSleepMode(radio))
-    {
-        sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_SLEEP_MODE);
-        while (!sx1276_isSleepMode(radio))
-        {
-            uart_puts(radio->uart->inst, ".");
-        }
-        uart_puts(radio->uart->inst, " Done\r\n");
-    }
-    else
-    {
-        uart_puts(radio->uart->inst, "... Already\r\n");
-    }
-}
-
-bool sx1276_isStandByMode(radio_t *radio)
-{
-    uint8_t opMode = getOperatingMode(radio);
-    return (opMode & ~OPMODE_MASK) == OPMODE_STDBY_MODE;
-}
-
-void sx1276_setStandByMode(radio_t *radio)
-{
-    uart_puts(radio->uart->inst, "Going to STANDBY mode ");
-    if (!sx1276_isStandByMode(radio))
-    {
-        sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_STDBY_MODE);
-        while (!sx1276_isStandByMode(radio))
-        {
-            uart_puts(radio->uart->inst, ".");
-        }
-        uart_puts(radio->uart->inst, " Done\r\n");
-    }
-    else
-    {
-        uart_puts(radio->uart->inst, "... Already\r\n");
-    }
-}
-
-bool sx1276_isTxMode(radio_t *radio)
-{
-    uint8_t opMode = getOperatingMode(radio);
-    return (opMode & ~OPMODE_MASK) == OPMODE_TX_MODE;
-}
-
-void sx1276_setTxMode(radio_t *radio)
-{
-    uart_puts(radio->uart->inst, "Going to TX mode ");
-    if (!sx1276_isTxMode(radio))
-    {
-        sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_TX_MODE);
-        while (!sx1276_isTxMode(radio))
-        {
-            uart_puts(radio->uart->inst, ".");
-        }
-        uart_puts(radio->uart->inst, " Done\r\n");
-    }
-    else
-    {
-        uart_puts(radio->uart->inst, "... Already\r\n");
-    }
-}
-
-bool sx1276_isRxMode(radio_t *radio)
-{
-    uint8_t opMode = getOperatingMode(radio);
-    return (opMode & ~OPMODE_MASK) == OPMODE_RXSINGLE_MODE;
-}
-
-void sx1276_setRxMode(radio_t *radio)
-{
-    uart_puts(radio->uart->inst, "Going to RX mode ");
-    if (!sx1276_isRxMode(radio))
-    {
-        sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_RXSINGLE_MODE);
-        while (!sx1276_isRxMode(radio))
-        {
-            uart_puts(radio->uart->inst, ".");
-        }
-        uart_puts(radio->uart->inst, " Done\r\n");
-    }
-    else
-    {
-        uart_puts(radio->uart->inst, "... Already\r\n");
-    }
 }
 
 void sx1276_send(radio_t *radio, uint8_t *data, size_t size)
@@ -332,7 +340,15 @@ void sx1276_send(radio_t *radio, uint8_t *data, size_t size)
     uart_puts(radio->uart->inst, " Done\r\n");
 }
 
-void sx1276_receive(radio_t *radio, uint16_t timeout)
+void sx1276_configureReceiver(radio_t *radio, rx_cfg_t *config)
+{
+}
+
+void sx1276_configureReceiverWithDefaults(radio_t *radio)
+{
+}
+
+void sx1276_receive(radio_t *radio)
 {
     while (sx1276_isRxMode(radio))
     {

@@ -26,21 +26,23 @@ typedef struct
     uint8_t opModeDefaults;
 } radio_t;
 
+typedef struct
+{
+
+} tx_cfg_t;
+
+typedef struct
+{
+    uint16_t timeout;
+} rx_cfg_t;
+
 radio_t sx1276_createRadio(uart_t *uart, spi_t *spi, bool isLowRange);
-
-uint8_t sx1276_readRegister(radio_t *radio, uint8_t addr);
-void sx1276_writeRegister(radio_t *radio, uint8_t addr, uint8_t data);
-
 void sx1276_logInfo(radio_t *radio);
 
-bool sx1276_isSleepMode(radio_t *radio);
-bool sx1276_isStandByMode(radio_t *radio);
-bool sx1276_isTxMode(radio_t *radio);
-bool sx1276_isRxMode(radio_t *radio);
-void sx1276_setSleepMode(radio_t *radio);
-void sx1276_setStandByMode(radio_t *radio);
-void sx1276_setTxMode(radio_t *radio);
-void sx1276_setRxMode(radio_t *radio);
-
+void sx1276_configureSender(radio_t *radio, tx_cfg_t *config);
+void sx1276_configureSenderWithDefaults(radio_t *radio);
 void sx1276_send(radio_t *radio, uint8_t *data, size_t size);
-void sx1276_receive(radio_t *radio, uint16_t timeout);
+
+void sx1276_configureReceiver(radio_t *radio, rx_cfg_t *config);
+void sx1276_configureReceiverWithDefaults(radio_t *radio);
+void sx1276_receive(radio_t *radio);

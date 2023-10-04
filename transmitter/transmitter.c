@@ -29,6 +29,7 @@ int main()
     spi_t spi = {SPI0_ID, SPI0_CS_PIN, SPI0_SCK_PIN, SPI0_MOSI_PIN, SPI0_MISO_PIN};
     radio_t radio = sx1276_createRadio(&uart, &spi, true);
 
+    sx1276_configureSenderWithDefaults(&radio);
     sx1276_logInfo(&radio);
 
     uint8_t data[] = {'P', 'I', 'N', 'G'};
