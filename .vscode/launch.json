@@ -2,19 +2,43 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Pico Debug",
+            "name": "Transmitter",
             "type": "cortex-debug",
             "cwd": "${workspaceRoot}",
-            "executable": "${command:cmake.launchTargetPath}",
+            "executable": "build/transmitter/transmitter.elf",
             "request": "launch",
             "servertype": "openocd",
             "gdbPath": "gdb-multiarch",
-            "configFiles": [
-                "interface/cmsis-dap.cfg",
-                "target/rp2040.cfg"
-            ],
             "searchDir": [
                 "${env:PICO_SDK_PATH}/../openocd/tcl"
+            ],
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "probe1.cfg",
+                "target/rp2040.cfg"
+            ],
+            "svdFile": "${env:PICO_SDK_PATH}/src/rp2040/hardware_regs/rp2040.svd",
+            "runToEntryPoint": "main",
+            "postRestartCommands": [
+                "break main",
+                "continue"
+            ]
+        },
+        {
+            "name": "Receiver",
+            "type": "cortex-debug",
+            "cwd": "${workspaceRoot}",
+            "executable": "build/receiver/receiver.elf",
+            "request": "launch",
+            "servertype": "openocd",
+            "gdbPath": "gdb-multiarch",
+            "searchDir": [
+                "${env:PICO_SDK_PATH}/../openocd/tcl"
+            ],
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "probe2.cfg",
+                "target/rp2040.cfg"
             ],
             "svdFile": "${env:PICO_SDK_PATH}/src/rp2040/hardware_regs/rp2040.svd",
             "runToEntryPoint": "main",
