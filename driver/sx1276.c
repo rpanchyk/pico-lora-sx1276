@@ -2,7 +2,6 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "sx1276.h"
-#include "regs.h"
 
 static uint8_t sx1276_readRegister(radio_t *radio, uint8_t addr)
 {
