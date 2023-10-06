@@ -1,0 +1,49 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build_transmitter",
+            // "type": "shell",
+            // "command": "cmake --build ${cmake.buildDirectory} --config Debug --target transmitter -j 4 --",
+            // "options": {
+            //     "cwd": "${cmake.buildDirectory}"
+            // },
+            "type": "cmake",
+            "command": "build",
+            "targets": [
+                "transmitter"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            },
+            "group": "build"
+        },
+        {
+            "label": "build_receiver",
+            // "type": "shell",
+            // "command": "cmake --build ${workspaceFolder}/build --config Debug --target receiver -j 4 --",
+            // "options": {
+            //     "cwd": "${workspaceFolder}/build"
+            // },
+            "type": "cmake",
+            "command": "build",
+            "targets": [
+                "receiver"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": true
+            },
+            "group": "build"
+        }
+    ]
+}

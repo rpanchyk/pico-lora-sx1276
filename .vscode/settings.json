@@ -16,7 +16,7 @@
             "visibility": "hidden"
         },
         "launchTarget": {
-            "visibility": "default"
+            "visibility": "hidden"
         },
         "debug": {
             "visibility": "hidden"
