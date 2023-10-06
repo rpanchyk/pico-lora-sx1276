@@ -214,19 +214,19 @@ static bool sx1276_isRxMode(radio_t *radio)
 
 static void sx1276_setRxMode(radio_t *radio)
 {
-    uart_puts(radio->uart->inst, "Going to RX mode ");
+    // uart_puts(radio->uart->inst, "Going to RX mode ");
     if (!sx1276_isRxMode(radio))
     {
         sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_RXSINGLE_MODE);
         while (!sx1276_isRxMode(radio))
         {
-            uart_puts(radio->uart->inst, ".");
+            // uart_puts(radio->uart->inst, ".");
         }
-        uart_puts(radio->uart->inst, " Done\r\n");
+        // uart_puts(radio->uart->inst, " Done\r\n");
     }
     else
     {
-        uart_puts(radio->uart->inst, "... Already\r\n");
+        // uart_puts(radio->uart->inst, "... Already\r\n");
     }
 }
 
@@ -255,6 +255,7 @@ radio_t sx1276_createRadio(uart_t *uart, spi_t *spi, bool isLowRange)
     // TODO
     sx1276_writeRegister(&radio, REG_MODEMCONFIG2, 0b01110000);
     sx1276_writeRegister(&radio, REG_SYMBTIMEOUTLSB, 0b11111111);
+    // sx1276_writeRegister(&radio, REG_IRQFLAGSMASK, 0x00);
 
     return radio;
 }
@@ -349,38 +350,51 @@ void sx1276_configureReceiverWithDefaults(radio_t *radio)
 
 void sx1276_receive(radio_t *radio)
 {
-    while (sx1276_isRxMode(radio))
+    // while (sx1276_isRxMode(radio))
+    // {
+    //     uart_puts(radio->uart->inst, "Wait for ongoing RX is finished...\r\n");
+    //     sleep_ms(1);
+    // }
+    // sx1276_setStandByMode(radio);
+
+    if (!sx1276_isRxMode(radio))
     {
-        uart_puts(radio->uart->inst, "Wait for ongoing RX is finished...\r\n");
-        sleep_ms(1);
+        // clear IRQs
+        sx1276_writeRegister(radio, REG_IRQFLAGSMASK, 0b00001111);
+        uint8_t irqFlagsMask = sx1276_readRegister(radio, REG_IRQFLAGSMASK);
+        uart_putc(radio->uart->inst, irqFlagsMask);
+
+        sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
+
+        uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFORXBASEADDR);
+        sx1276_writeRegister(radio, REG_FIFOADDRPTR, addrPtr);
+
+        sx1276_setRxMode(radio);
     }
-    sx1276_setStandByMode(radio);
-
-    // uart_puts(radio->uart->inst, "Configuring");
-
-    uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFORXBASEADDR);
-    sx1276_writeRegister(radio, REG_FIFOADDRPTR, addrPtr);
-
-    sx1276_setRxMode(radio);
 
     // RX mode switched to STANDBY mode automatically after data is received or timed out
-    uart_puts(radio->uart->inst, "Receiving ");
+    // uart_puts(radio->uart->inst, "Receiving ...");
     while (!sx1276_isStandByMode(radio))
     {
-        uart_puts(radio->uart->inst, ".");
-        sleep_ms(1);
+        // uart_puts(radio->uart->inst, ".");
+        // sleep_ms(1);
     }
-    uart_puts(radio->uart->inst, " Done\r\n");
+    // uart_puts(radio->uart->inst, " Done\r\n");
 
     // Ensure that ValidHeader, PayloadCrcError, RxDone and RxTimeout interrupts
     // are not asserted to ensure that packet reception has terminated successfully
     uint8_t irqFlagsMask = sx1276_readRegister(radio, REG_IRQFLAGSMASK);
     uint8_t irqFlags = sx1276_readRegister(radio, REG_IRQFLAGS);
 
-    uint8_t rxTimeout = (irqFlags & ~IRQFLAGS_RXTIMEOUT_MASK) >> 7;
-    uint8_t rxDone = (irqFlags & ~IRQFLAGS_RXDONE_MASK) >> 6;
-    uint8_t payloadCrcError = (irqFlags & ~IRQFLAGS_PAYLOADCRCERROR_MASK) >> 5;
-    uint8_t validHeader = (irqFlags & ~IRQFLAGS_VALIDHEADER_MASK) >> 4;
+    // while (!irqFlags)
+    // {
+    //     irqFlags = sx1276_readRegister(radio, REG_IRQFLAGS);
+    // }
+
+    uint8_t rxTimeout = (irqFlags & IRQFLAGS_RXTIMEOUT_MASK) >> 7;
+    uint8_t rxDone = (irqFlags & IRQFLAGS_RXDONE_MASK) >> 6;
+    uint8_t payloadCrcError = (irqFlags & IRQFLAGS_PAYLOADCRCERROR_MASK) >> 5;
+    uint8_t validHeader = (irqFlags & IRQFLAGS_VALIDHEADER_MASK) >> 4;
 
     uint8_t rxHeaderCntValueMsb = sx1276_readRegister(radio, REG_RXHEADERCNTVALUEMSB);
     uint8_t rxHeaderCntValueLsb = sx1276_readRegister(radio, REG_RXHEADERCNTVALUELSB);
@@ -392,13 +406,13 @@ void sx1276_receive(radio_t *radio)
 
     uint8_t rxNbBytes = sx1276_readRegister(radio, REG_RXNBBYTES);
 
-    if (rxDone)
+    if (rxTimeout)
     {
-        if (rxTimeout)
-        {
-            uart_puts(radio->uart->inst, "Timeout error\r\n");
-        }
-        else if (!validHeader)
+        uart_puts(radio->uart->inst, "Timeout error\r\n");
+    }
+    else if (rxDone)
+    {
+        if (!validHeader)
         {
             uart_puts(radio->uart->inst, "Header error\r\n");
         }
@@ -408,7 +422,7 @@ void sx1276_receive(radio_t *radio)
         }
         else
         {
-            uart_puts(radio->uart->inst, "Reception successful\r\n");
+            // uart_puts(radio->uart->inst, "Reception successful\r\n");
 
             char buffer[512];
             sprintf(buffer,
@@ -431,25 +445,25 @@ void sx1276_receive(radio_t *radio)
                     rxHeaderCntValue,
                     rxPacketCntValue,
                     rxNbBytes);
-            uart_puts(radio->uart->inst, buffer);
+            // uart_puts(radio->uart->inst, buffer);
 
             uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFORXCURRENTADDR);
+            // uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFORXBYTEADDR) - rxNbBytes;
             sx1276_writeRegister(radio, REG_FIFOADDRPTR, addrPtr);
 
-            uart_puts(radio->uart->inst, "Reading data ...");
+            // uart_puts(radio->uart->inst, "Reading data ...");
             uint8_t data[rxNbBytes];
             for (uint8_t i = 0; i < rxNbBytes; i++)
             {
                 data[i] = sx1276_readRegister(radio, REG_FIFO);
             }
-            uart_puts(radio->uart->inst, " Done\r\n");
+            // uart_puts(radio->uart->inst, " Done\r\n");
 
             uart_puts(radio->uart->inst, "Received: ");
             uart_puts(radio->uart->inst, data);
             uart_puts(radio->uart->inst, "\r\n\r\n");
         }
-    }
 
-    // clear IRQs
-    sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
+        // sx1276_writeRegister(radio, REG_FIFOADDRPTR, sx1276_readRegister(radio, REG_FIFORXBASEADDR));
+    }
 }
