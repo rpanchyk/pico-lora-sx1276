@@ -35,7 +35,8 @@ int main()
     uint8_t data[] = {'P', 'I', 'N', 'G'};
     while (true)
     {
-        sx1276_send(&radio, data, sizeof(data));
+        // sx1276_send(&radio, data, sizeof(data));
+        sx1276_send(&radio, data, 4);
         sleep_ms(1000);
     }
 }
