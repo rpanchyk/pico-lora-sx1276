@@ -245,6 +245,13 @@ static uint16_t getSymbTimeout(radio_t *radio)
     return (symbTimeoutMsb << 8) + symbTimeoutLsb;
 }
 
+static uint16_t getPreambleLength(radio_t *radio)
+{
+    uint8_t preambleLengthMsb = sx1276_readRegister(radio, REG_PREAMBLEMSB);
+    uint8_t preambleLengthLsb = sx1276_readRegister(radio, REG_PREAMBLELSB);
+    return (preambleLengthMsb << 8) + preambleLengthLsb;
+}
+
 static bool sx1276_isSleepMode(radio_t *radio)
 {
     uint8_t opMode = getOperatingMode(radio);
@@ -329,11 +336,11 @@ static void sx1276_setRxMode(radio_t *radio)
     if (!sx1276_isRxMode(radio))
     {
         sx1276_writeRegister(radio, REG_OPMODE, radio->opModeDefaults | OPMODE_RXSINGLE_MODE);
-        while (!sx1276_isRxMode(radio))
-        {
-            uart_puts(radio->uart->inst, ".");
-        }
-        uart_puts(radio->uart->inst, " Done\r\n");
+        // while (!sx1276_isRxMode(radio))
+        // {
+        //     uart_puts(radio->uart->inst, ".");
+        // }
+        // uart_puts(radio->uart->inst, " Done\r\n");
     }
     else
     {
@@ -363,18 +370,6 @@ radio_t sx1276_createRadio(uart_t *uart, spi_t *spi, bool isLowRange)
     radio_t radio = {uart, spi, opModeDefaults};
     sx1276_setSleepMode(&radio); // to enable Lora when change mode next time
 
-    // Tx
-    // setPaConfigMaxPower(&radio, 7);
-    // setOcpOn(&radio, 1);
-
-    // Rx
-    // setLnaGain(&radio, 1);
-
-    // TODO
-    // sx1276_writeRegister(&radio, REG_MODEMCONFIG2, 0b01110000);
-    // sx1276_writeRegister(&radio, REG_SYMBTIMEOUTLSB, 0b11111111);
-    // sx1276_writeRegister(&radio, REG_IRQFLAGSMASK, 0x00);
-
     return radio;
 }
 
@@ -401,6 +396,7 @@ void sx1276_logInfo(radio_t *radio)
     uint8_t txContinuousMode = getTxContinuousMode(radio);
     uint8_t rxPayloadCrcOn = getRxPayloadCrcOn(radio);
     uint16_t symbTimeout = getSymbTimeout(radio);
+    uint16_t preambleLength = getPreambleLength(radio);
 
     char buffer[1024];
     sprintf(buffer,
@@ -425,6 +421,7 @@ void sx1276_logInfo(radio_t *radio)
             \r\nTxContinuousMode: %u \
             \r\nRxPayloadCrcOn: %u \
             \r\nSymbTimeout: %lu \
+            \r\nPreambleLength: %lu \
             \r\n\r\n\0",
             version,
             opMode,
@@ -446,8 +443,19 @@ void sx1276_logInfo(radio_t *radio)
             lnaBoostHf,
             txContinuousMode,
             rxPayloadCrcOn,
-            symbTimeout);
+            symbTimeout,
+            preambleLength);
     uart_puts(radio->uart->inst, buffer);
+
+    uart_puts(radio->uart->inst, "\r\n---RegDump---\r\n");
+    for (uint8_t i = 0; i <= 112; i++)
+    {
+        uint8_t value = sx1276_readRegister(radio, i);
+        char buffer[16];
+        sprintf(buffer, "0x%02X: 0x%02X \r\n\0", i, value);
+        uart_puts(radio->uart->inst, buffer);
+    }
+    uart_puts(radio->uart->inst, "---RegDump---\r\n");
 }
 
 void sx1276_configureSender(radio_t *radio, tx_cfg_t *config)
@@ -459,13 +467,13 @@ void sx1276_configureSenderWithDefaults(radio_t *radio)
     // setPaConfigMaxPower(radio, 7);
     // setOcpOn(radio, 1);
 
-    sx1276_writeRegister(radio, REG_MODEMCONFIG2, 0b01110000);
+    // sx1276_writeRegister(radio, REG_MODEMCONFIG2, 0b01110000);
     // sx1276_writeRegister(radio, REG_SYMBTIMEOUTLSB, 0b11111111);
 
-    if (!sx1276_isStandByMode(radio))
-    {
-        sx1276_setStandByMode(radio);
-    }
+    // if (!sx1276_isStandByMode(radio))
+    // {
+    //     sx1276_setStandByMode(radio);
+    // }
 }
 
 void sx1276_send(radio_t *radio, uint8_t *data, size_t size)
@@ -475,18 +483,24 @@ void sx1276_send(radio_t *radio, uint8_t *data, size_t size)
     //     uart_puts(radio->uart->inst, "Wait for ongoing TX is finished...\r\n");
     //     sleep_ms(1);
     // }
-    // if (!sx1276_isStandByMode(radio))
-    // {
-    //     sx1276_setStandByMode(radio);
-    // }
-
-    uart_puts(radio->uart->inst, "Waiting for STDBY mode ...");
-    while (!sx1276_isStandByMode(radio))
+    uart_puts(radio->uart->inst, "\r\n");
+    if (sx1276_isTxMode(radio))
     {
-        uart_puts(radio->uart->inst, ".");
-        sleep_ms(1);
+        uart_puts(radio->uart->inst, "TX in progress...\r\n");
+        return;
     }
-    uart_puts(radio->uart->inst, " Done\r\n");
+    if (!sx1276_isStandByMode(radio))
+    {
+        sx1276_setStandByMode(radio);
+    }
+
+    // uart_puts(radio->uart->inst, "Waiting for STDBY mode ...");
+    // while (!sx1276_isStandByMode(radio))
+    // {
+    //     uart_puts(radio->uart->inst, ".");
+    //     sleep_ms(1);
+    // }
+    // uart_puts(radio->uart->inst, " Done\r\n");
 
     uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFOTXBASEADDR);
     sx1276_writeRegister(radio, REG_FIFOADDRPTR, addrPtr);
@@ -510,6 +524,27 @@ void sx1276_send(radio_t *radio, uint8_t *data, size_t size)
         sleep_ms(1);
     }
     uart_puts(radio->uart->inst, " Done\r\n");
+
+    // sx1276_logInfo(radio);
+
+    sx1276_setSleepMode(radio);
+
+    // uart_puts(radio->uart->inst, "Waiting for SLEEP mode ...");
+    // while (!sx1276_isSleepMode(radio))
+    // {
+    //     uart_puts(radio->uart->inst, ".");
+    //     sleep_ms(1);
+    // }
+    // uart_puts(radio->uart->inst, " Done\r\n");
+
+    // sx1276_setStandByMode(radio);
+    // uart_puts(radio->uart->inst, "Waiting for STDBY mode ...");
+    // while (!sx1276_isStandByMode(radio))
+    // {
+    //     uart_puts(radio->uart->inst, ".");
+    //     sleep_ms(1);
+    // }
+    // uart_puts(radio->uart->inst, " Done\r\n");
 }
 
 void sx1276_configureReceiver(radio_t *radio, rx_cfg_t *config)
@@ -520,18 +555,29 @@ void sx1276_configureReceiverWithDefaults(radio_t *radio)
 {
     // setLnaGain(radio, 1);
 
-    sx1276_writeRegister(radio, REG_MODEMCONFIG2, 0b01110000);
-    // sx1276_writeRegister(radio, REG_SYMBTIMEOUTLSB, 0b11111111);
+    // sx1276_writeRegister(radio, REG_MODEMCONFIG2, 0b01110000);
+    // sx1276_writeRegister(radio, REG_SYMBTIMEOUTLSB, 0b01100100);
 
-    if (!sx1276_isStandByMode(radio))
-    {
-        sx1276_setStandByMode(radio);
-    }
+    sx1276_writeRegister(radio, REG_LNA, 0b00100000);
+
+    // if (!sx1276_isStandByMode(radio))
+    // {
+    //     sx1276_setStandByMode(radio);
+    // }
 }
 
 void sx1276_receive(radio_t *radio)
 {
     uart_puts(radio->uart->inst, "\r\n");
+    if (sx1276_isRxMode(radio))
+    {
+        uart_puts(radio->uart->inst, "RX in progress...\r\n");
+        return;
+    }
+    if (!sx1276_isStandByMode(radio))
+    {
+        sx1276_setStandByMode(radio);
+    }
 
     // while (sx1276_isRxMode(radio))
     // {
@@ -540,63 +586,70 @@ void sx1276_receive(radio_t *radio)
     // }
     // sx1276_setStandByMode(radio);
 
-    sx1276_setSleepMode(radio);
-    uart_puts(radio->uart->inst, "Waiting for SLEEP mode ...");
-    while (!sx1276_isSleepMode(radio))
-    {
-        uart_puts(radio->uart->inst, ".");
-        // sleep_ms(1);
-    }
-    uart_puts(radio->uart->inst, " Done\r\n");
+    // sx1276_setSleepMode(radio);
+    // uart_puts(radio->uart->inst, "Waiting for SLEEP mode ...");
+    // while (!sx1276_isSleepMode(radio))
+    // {
+    //     uart_puts(radio->uart->inst, ".");
+    //     // sleep_ms(1);
+    // }
+    // uart_puts(radio->uart->inst, " Done\r\n");
 
-    sx1276_setStandByMode(radio);
-    uart_puts(radio->uart->inst, "Waiting for STDBY mode ...");
-    while (!sx1276_isStandByMode(radio))
-    {
-        uart_puts(radio->uart->inst, ".");
-        // sleep_ms(1);
-    }
-    uart_puts(radio->uart->inst, " Done\r\n");
+    // sx1276_setStandByMode(radio);
+    // uart_puts(radio->uart->inst, "Waiting for STDBY mode ...");
+    // while (!sx1276_isStandByMode(radio))
+    // {
+    //     uart_puts(radio->uart->inst, ".");
+    //     // sleep_ms(1);
+    // }
+    // uart_puts(radio->uart->inst, " Done\r\n");
 
     // if (!sx1276_isRxMode(radio))
     // {
     // clear IRQs
     // sx1276_writeRegister(radio, REG_IRQFLAGSMASK, 0b00001111);
-    sx1276_writeRegister(radio, REG_IRQFLAGSMASK, 0x0F);
+    // sx1276_writeRegister(radio, REG_IRQFLAGSMASK, 0x0F);
     // uint8_t irqFlagsMask = sx1276_readRegister(radio, REG_IRQFLAGSMASK);
     // uart_putc(radio->uart->inst, irqFlagsMask);
 
-    sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
+    // sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
 
-    uint8_t irqFlagsMask1 = sx1276_readRegister(radio, REG_IRQFLAGSMASK);
-    uint8_t irqFlags1 = sx1276_readRegister(radio, REG_IRQFLAGS);
+    // uint8_t irqFlagsMask1 = sx1276_readRegister(radio, REG_IRQFLAGSMASK);
+    // uint8_t irqFlags1 = sx1276_readRegister(radio, REG_IRQFLAGS);
 
     // sx1276_writeRegister(radio, REG_IRQFLAGSMASK, irqFlagsMask1);
     // sx1276_writeRegister(radio, REG_IRQFLAGS, irqFlags1);
 
-    char buffer2[512];
-    sprintf(buffer2,
-            "IrqFlagsMask: %u \
-            \r\nIrqFlags: %u \
-            \r\n",
-            irqFlagsMask1,
-            irqFlags1);
-    uart_puts(radio->uart->inst, buffer2);
+    // char buffer2[512];
+    // sprintf(buffer2,
+    //         "IrqFlagsMask: %u \
+    //         \r\nIrqFlags: %u \
+    //         \r\n",
+    //         irqFlagsMask1,
+    //         irqFlags1);
+    // uart_puts(radio->uart->inst, buffer2);
 
     uint8_t addrPtr = sx1276_readRegister(radio, REG_FIFORXBASEADDR);
     sx1276_writeRegister(radio, REG_FIFOADDRPTR, addrPtr);
 
-    sx1276_writeRegister(radio, REG_PAYLOADLENGTH, 4);
-    sx1276_writeRegister(radio, REG_MAXPAYLOADLENGTH, 4);
+    // sx1276_writeRegister(radio, REG_PAYLOADLENGTH, 4);
+    // sx1276_writeRegister(radio, REG_MAXPAYLOADLENGTH, 4);
 
     sx1276_setRxMode(radio);
     // }
 
+    // uint8_t modemStat = sx1276_readRegister(radio, REG_MODEMSTAT);
+    // char buffer3[32];
+    // sprintf(buffer3, "modemStat: %u \r\n", modemStat);
+    // uart_puts(radio->uart->inst, buffer3);
+
     // RX mode switched to STANDBY mode automatically after data is received or timed out
     uart_puts(radio->uart->inst, "Receiving ...");
     while (!sx1276_isStandByMode(radio))
+    // while ( (sx1276_readRegister(radio, REG_MODEMSTAT) & ~0b11111011) == 4)
     {
         uart_puts(radio->uart->inst, ".");
+        // modemStat = sx1276_readRegister(radio, REG_MODEMSTAT);
         // sleep_ms(1);
     }
     uart_puts(radio->uart->inst, " Done\r\n");
@@ -633,35 +686,54 @@ void sx1276_receive(radio_t *radio)
 
     uint8_t rxNbBytes = sx1276_readRegister(radio, REG_RXNBBYTES);
 
-    char buffer[512];
-    sprintf(buffer,
-            "IrqFlagsMask: %u \
-            \r\nIrqFlags: %u \
-            \r\nRxTimeout: %u \
-            \r\nRxDone: %u \
-            \r\nPayloadCrcError: %u \
-            \r\nValidHeader: %u \
-            \r\nRxHeaderCntValue: %u \
-            \r\nRxPacketCntValue: %u \
-            \r\nRxNbBytes: %u \
-            \r\n",
-            irqFlagsMask,
-            irqFlags,
-            rxTimeout,
-            rxDone,
-            payloadCrcError,
-            validHeader,
-            rxHeaderCntValue,
-            rxPacketCntValue,
-            rxNbBytes);
-    uart_puts(radio->uart->inst, buffer);
+    // char buffer[512];
+    // sprintf(buffer,
+    //         "IrqFlagsMask: %u \
+    //         \r\nIrqFlags: %u \
+    //         \r\nRxTimeout: %u \
+    //         \r\nRxDone: %u \
+    //         \r\nPayloadCrcError: %u \
+    //         \r\nValidHeader: %u \
+    //         \r\nRxHeaderCntValue: %u \
+    //         \r\nRxPacketCntValue: %u \
+    //         \r\nRxNbBytes: %u \
+    //         \r\n",
+    //         irqFlagsMask,
+    //         irqFlags,
+    //         rxTimeout,
+    //         rxDone,
+    //         payloadCrcError,
+    //         validHeader,
+    //         rxHeaderCntValue,
+    //         rxPacketCntValue,
+    //         rxNbBytes);
+    // uart_puts(radio->uart->inst, buffer);
 
     if (rxTimeout)
     {
+        // sx1276_writeRegister(radio, REG_IRQFLAGS, (sx1276_readRegister(radio, REG_IRQFLAGS) | (1 << 7)));
         uart_puts(radio->uart->inst, "Timeout error\r\n");
+        
+        uint8_t irqFlags1 = sx1276_readRegister(radio, REG_IRQFLAGS);
+        char buffer1[32];
+        sprintf(buffer1, "irqFlags: %u \r\n", irqFlags1);
+        uart_puts(radio->uart->inst, buffer1);
+
+        sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
+
+        uint8_t irqFlags2 = sx1276_readRegister(radio, REG_IRQFLAGS);
+        char buffer2[32];
+        sprintf(buffer2, "irqFlags: %u \r\n", irqFlags2);
+        uart_puts(radio->uart->inst, buffer2);
+
+        sx1276_setSleepMode(radio);
     }
     else if (rxDone)
     {
+        // sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
+
+        uart_puts(radio->uart->inst, "rxDone\r\n");
+
         if (!validHeader)
         {
             uart_puts(radio->uart->inst, "Header error\r\n");
@@ -716,5 +788,10 @@ void sx1276_receive(radio_t *radio)
         }
 
         // sx1276_writeRegister(radio, REG_FIFOADDRPTR, sx1276_readRegister(radio, REG_FIFORXBASEADDR));
+        sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
+        sx1276_setSleepMode(radio);
     }
+
+    // sx1276_writeRegister(radio, REG_IRQFLAGSMASK, 0x0F);
+    // sx1276_writeRegister(radio, REG_IRQFLAGS, 0xFF);
 }

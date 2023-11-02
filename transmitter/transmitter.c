@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
-#include "hardware/uart.h"
-#include "hardware/irq.h"
 #include "sx1276.h"
 
 #define UART0_ID uart0
